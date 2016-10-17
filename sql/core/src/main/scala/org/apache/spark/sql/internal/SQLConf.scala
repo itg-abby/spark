@@ -269,6 +269,13 @@ object SQLConf {
       .booleanConf
       .createWithDefault(false)
 
+  val HIVE_FILESOURCE_PARTITION_PRUNING =
+    SQLConfigBuilder("spark.sql.hive.filesourcePartitionPruning")
+      .doc("When true, enable metastore partition pruning for file source tables as well. " +
+           "This is currently implemented for converted Hive tables only.")
+      .booleanConf
+      .createWithDefault(true)
+
   val OPTIMIZER_METADATA_ONLY = SQLConfigBuilder("spark.sql.optimizer.metadataOnly")
     .doc("When true, enable the metadata-only query optimization that use the table's metadata " +
       "to produce the partition columns instead of table scans. It applies when all the columns " +
@@ -380,14 +387,6 @@ object SQLConf {
         "LibSVM data sources.")
       .intConf
       .createWithDefault(32)
-
-  // Whether to perform eager analysis when constructing a dataframe.
-  // Set to false when debugging requires the ability to look at invalid query plans.
-  val DATAFRAME_EAGER_ANALYSIS = SQLConfigBuilder("spark.sql.eagerAnalysis")
-    .internal()
-    .doc("When true, eagerly applies query analysis on DataFrame operations.")
-    .booleanConf
-    .createWithDefault(true)
 
   // Whether to automatically resolve ambiguity in join conditions for self-joins.
   // See SPARK-6231.
@@ -578,7 +577,8 @@ object SQLConf {
   val NDV_MAX_ERROR =
     SQLConfigBuilder("spark.sql.statistics.ndv.maxError")
       .internal()
-      .doc("The maximum estimation error allowed in HyperLogLog++ algorithm.")
+      .doc("The maximum estimation error allowed in HyperLogLog++ algorithm when generating " +
+        "column level statistics.")
       .doubleConf
       .createWithDefault(0.05)
 
@@ -675,6 +675,8 @@ private[sql] class SQLConf extends Serializable with CatalystConf with Logging {
 
   def metastorePartitionPruning: Boolean = getConf(HIVE_METASTORE_PARTITION_PRUNING)
 
+  def filesourcePartitionPruning: Boolean = getConf(HIVE_FILESOURCE_PARTITION_PRUNING)
+
   def gatherFastStats: Boolean = getConf(GATHER_FASTSTAT)
 
   def optimizerMetadataOnly: Boolean = getConf(OPTIMIZER_METADATA_ONLY)
@@ -737,8 +739,6 @@ private[sql] class SQLConf extends Serializable with CatalystConf with Logging {
     getConf(SQLConf.PARALLEL_PARTITION_DISCOVERY_THRESHOLD)
 
   def bucketingEnabled: Boolean = getConf(SQLConf.BUCKETING_ENABLED)
-
-  def dataFrameEagerAnalysis: Boolean = getConf(DATAFRAME_EAGER_ANALYSIS)
 
   def dataFrameSelfJoinAutoResolveAmbiguity: Boolean =
     getConf(DATAFRAME_SELF_JOIN_AUTO_RESOLVE_AMBIGUITY)
@@ -924,8 +924,11 @@ object StaticSQLConf {
     .intConf
     .createWithDefault(4000)
 
+  // When enabling the debug, Spark SQL internal table properties are not filtered out; however,
+  // some related DDL commands (e.g., ANALYZE TABLE and CREATE TABLE LIKE) might not work properly.
   val DEBUG_MODE = buildConf("spark.sql.debug")
     .internal()
+    .doc("Only used for internal debugging. Not all functions are supported when it is enabled.")
     .booleanConf
     .createWithDefault(false)
 }
