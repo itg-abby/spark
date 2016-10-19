@@ -794,6 +794,11 @@ class SparseVector(Vector):
             return Vectors._equals(self.indices, self.values, list(xrange(len(other))), other.array)
         return False
 
+    def __getattr__(self, item):
+        csr = scipy.sparse.csr_matrix((self.values, self.indices, [0, 2]))
+        return getattr(csr, item)
+
+
     def __getitem__(self, index):
         inds = self.indices
         vals = self.values
